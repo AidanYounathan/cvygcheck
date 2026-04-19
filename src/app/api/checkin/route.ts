@@ -44,12 +44,14 @@ export async function POST(request: NextRequest) {
   }
 
   // Security layer 3: geofence
-  try {
-    if (!isWithinGeofence(latitude, longitude)) {
-      return NextResponse.json({ error: "OUTSIDE_GEOFENCE" }, { status: 403 });
+  if (process.env.BYPASS_GEOFENCE !== "true") {
+    try {
+      if (!isWithinGeofence(latitude, longitude)) {
+        return NextResponse.json({ error: "OUTSIDE_GEOFENCE" }, { status: 403 });
+      }
+    } catch {
+      return NextResponse.json({ error: "GEOFENCE_MISCONFIGURED" }, { status: 500 });
     }
-  } catch {
-    return NextResponse.json({ error: "GEOFENCE_MISCONFIGURED" }, { status: 500 });
   }
 
   // Security layer 4: one submission per device per day
