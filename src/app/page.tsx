@@ -1,13 +1,5 @@
-import Image from "next/image";
+import { redirect } from "next/navigation";
 
-export default function Home() {
-  return (
-    <main>
-      <div>
-        <div>
-          <h1>CVYG Youth Check-in</h1>
-        </div>
-      </div>
-    </main>
-  );
+export default function Page() {
+  redirect("/kiosk");
 }

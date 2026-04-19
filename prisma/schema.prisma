@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// For production on Vercel: change provider to "postgresql"
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Token {
+  id        String    @id @default(cuid())
+  value     String    @unique
+  claimed   Boolean   @default(false)
+  claimedAt DateTime?
+  used      Boolean   @default(false)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  checkIn   CheckIn?
+}
+
+model CheckIn {
+  id          String   @id @default(cuid())
+  firstName   String
+  lastName    String
+  parish      String
+  deviceId    String
+  userAgent   String
+  ipAddress   String
+  latitude    Float
+  longitude   Float
+  submittedAt DateTime @default(now())
+  tokenId     String   @unique
+  token       Token    @relation(fields: [tokenId], references: [id])
+}
