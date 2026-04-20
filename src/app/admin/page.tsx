@@ -1,13 +1,14 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { HourlyChart, ParishChart } from "./_components/Charts";
+import { CheckInTable } from "./_components/CheckInTable";
 
 export default async function AdminPage(props: {
   searchParams: Promise<{ date?: string }>;
 }) {
   const cookieStore = await cookies();
   const session = cookieStore.get("admin-session");
-
   if (!session || session.value !== process.env.ADMIN_PASSWORD) {
     redirect("/admin/login");
   }
@@ -22,16 +23,43 @@ export default async function AdminPage(props: {
     orderBy: { submittedAt: "desc" },
   });
 
-  const parishCounts = checkIns.reduce<Record<string, number>>((acc, ci) => {
+  const total = checkIns.length;
+
+  // Parish chart data
+  const parishMap = checkIns.reduce<Record<string, number>>((acc, ci) => {
     acc[ci.parish] = (acc[ci.parish] ?? 0) + 1;
     return acc;
   }, {});
+  const parishData = Object.entries(parishMap)
+    .map(([parish, count]) => ({ parish, count }))
+    .sort((a, b) => b.count - a.count);
 
-  const sortedParishes = Object.entries(parishCounts).sort((a, b) => b[1] - a[1]);
-  const total = checkIns.length;
+  // Hourly chart data
+  const hourlyMap = checkIns.reduce<Record<number, number>>((acc, ci) => {
+    const h = ci.submittedAt.getUTCHours();
+    acc[h] = (acc[h] ?? 0) + 1;
+    return acc;
+  }, {});
+  const hourlyData = Object.entries(hourlyMap)
+    .map(([h, count]) => ({
+      hour: `${String(parseInt(h) % 12 || 12)}${parseInt(h) < 12 ? "am" : "pm"}`,
+      count,
+    }))
+    .sort((a, b) => parseInt(a.hour) - parseInt(b.hour));
+
+  // Serialize for client components
+  const serialized = checkIns.map((ci) => ({
+    id: ci.id,
+    firstName: ci.firstName,
+    lastName: ci.lastName,
+    parish: ci.parish,
+    submittedAt: ci.submittedAt.toISOString(),
+    ipAddress: ci.ipAddress,
+    deviceId: ci.deviceId,
+  }));
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "#FAF7F2", fontFamily: "inherit" }}>
+    <div style={{ minHeight: "100vh", backgroundColor: "#FAF7F2" }}>
       {/* Header */}
       <div style={{
         backgroundColor: "#1B3664",
@@ -39,6 +67,8 @@ export default async function AdminPage(props: {
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
+        flexWrap: "wrap",
+        gap: "1rem",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           <div style={{ width: "1px", height: "1.5rem", backgroundColor: "#C8A84B" }} />
@@ -60,7 +90,6 @@ export default async function AdminPage(props: {
                 border: "1px solid #C8A84B",
                 color: "#FAF7F2",
                 fontSize: "0.75rem",
-                letterSpacing: "0.05em",
                 colorScheme: "dark",
               }}
             />
@@ -91,12 +120,11 @@ export default async function AdminPage(props: {
         </div>
       </div>
 
-      <div style={{ padding: "2rem", maxWidth: "1100px", margin: "0 auto" }}>
-
+      <div style={{ padding: "2rem", maxWidth: "1200px", margin: "0 auto" }}>
         {/* Stats */}
-        <div style={{ display: "flex", gap: "1rem", marginBottom: "2rem", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
           <StatCard label="Total Check-Ins" value={total} />
-          <StatCard label="Parishes Represented" value={sortedParishes.length} />
+          <StatCard label="Parishes" value={parishData.length} />
           <StatCard label="Date" value={dateStr} small />
         </div>
 
@@ -114,84 +142,15 @@ export default async function AdminPage(props: {
             No check-ins on this date
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "1.5rem", alignItems: "start" }}>
-
-            {/* Parish breakdown */}
-            <div style={{ backgroundColor: "#fff", border: "1px solid #E8E0D0", padding: "1.5rem" }}>
-              <h2 style={{ margin: "0 0 1.25rem", fontSize: "0.7rem", letterSpacing: "0.2em", color: "#C8A84B", textTransform: "uppercase" }}>
-                By Parish
-              </h2>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {sortedParishes.map(([parish, count]) => (
-                  <div key={parish}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.3rem" }}>
-                      <span style={{ fontSize: "0.8rem", color: "#1B3664" }}>{parish}</span>
-                      <span style={{ fontSize: "0.8rem", fontWeight: 500, color: "#1B3664" }}>
-                        {count} <span style={{ color: "#6B6B6B", fontWeight: 400 }}>({Math.round((count / total) * 100)}%)</span>
-                      </span>
-                    </div>
-                    <div style={{ height: "3px", backgroundColor: "#E8E0D0", borderRadius: "2px" }}>
-                      <div style={{
-                        height: "100%",
-                        width: `${(count / total) * 100}%`,
-                        backgroundColor: "#C8A84B",
-                        borderRadius: "2px",
-                      }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+            {/* Charts row */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+              <HourlyChart data={hourlyData} />
+              <ParishChart data={parishData} />
             </div>
 
-            {/* Check-ins table */}
-            <div style={{ backgroundColor: "#fff", border: "1px solid #E8E0D0", overflow: "hidden" }}>
-              <div style={{ padding: "1rem 1.5rem", borderBottom: "1px solid #E8E0D0" }}>
-                <h2 style={{ margin: 0, fontSize: "0.7rem", letterSpacing: "0.2em", color: "#C8A84B", textTransform: "uppercase" }}>
-                  Check-Ins
-                </h2>
-              </div>
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem" }}>
-                  <thead>
-                    <tr style={{ backgroundColor: "#FAF7F2" }}>
-                      {["Time", "Name", "Parish", "IP", "Device"].map((h) => (
-                        <th key={h} style={{
-                          padding: "0.6rem 1rem",
-                          textAlign: "left",
-                          fontSize: "0.65rem",
-                          letterSpacing: "0.15em",
-                          color: "#6B6B6B",
-                          textTransform: "uppercase",
-                          fontWeight: 400,
-                          whiteSpace: "nowrap",
-                          borderBottom: "1px solid #E8E0D0",
-                        }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {checkIns.map((ci, i) => (
-                      <tr key={ci.id} style={{ borderBottom: i < checkIns.length - 1 ? "1px solid #F0EAE0" : "none" }}>
-                        <td style={{ padding: "0.7rem 1rem", color: "#6B6B6B", whiteSpace: "nowrap" }}>
-                          {ci.submittedAt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                        </td>
-                        <td style={{ padding: "0.7rem 1rem", color: "#1B3664", whiteSpace: "nowrap" }}>
-                          {ci.firstName} {ci.lastName}
-                        </td>
-                        <td style={{ padding: "0.7rem 1rem", color: "#1B3664" }}>{ci.parish}</td>
-                        <td style={{ padding: "0.7rem 1rem", color: "#6B6B6B", fontFamily: "monospace", fontSize: "0.75rem" }}>
-                          {ci.ipAddress}
-                        </td>
-                        <td style={{ padding: "0.7rem 1rem", color: "#6B6B6B", fontFamily: "monospace", fontSize: "0.75rem" }}>
-                          {ci.deviceId.slice(0, 8)}…
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
+            {/* Table */}
+            <CheckInTable initialRows={serialized} />
           </div>
         )}
       </div>
@@ -204,9 +163,9 @@ function StatCard({ label, value, small }: { label: string; value: string | numb
     <div style={{
       backgroundColor: "#fff",
       border: "1px solid #E8E0D0",
+      borderTop: "3px solid #C8A84B",
       padding: "1.25rem 1.5rem",
       minWidth: "140px",
-      borderTop: "3px solid #C8A84B",
     }}>
       <div style={{ fontSize: small ? "1rem" : "2rem", fontWeight: 300, color: "#1B3664", marginBottom: "0.25rem" }}>
         {value}
