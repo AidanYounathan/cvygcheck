@@ -6,6 +6,7 @@ type Row = {
   id: string;
   firstName: string;
   lastName: string;
+  age: number;
   parish: string;
   submittedAt: string;
   ipAddress: string;
@@ -28,7 +29,7 @@ export function CheckInTable({ initialRows }: { initialRows: Row[] }) {
 
   function startEdit(row: Row) {
     setEditing(row.id);
-    setDraft({ firstName: row.firstName, lastName: row.lastName, parish: row.parish });
+    setDraft({ firstName: row.firstName, lastName: row.lastName, age: row.age, parish: row.parish });
   }
 
   function cancelEdit() {
@@ -63,7 +64,7 @@ export function CheckInTable({ initialRows }: { initialRows: Row[] }) {
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem" }}>
           <thead>
             <tr style={{ backgroundColor: "#FAF7F2" }}>
-              {["Time", "Name", "Parish", "IP", "Device", ""].map((h, i) => (
+              {["Time", "Name", "Age", "Parish", "IP", "Device", ""].map((h, i) => (
                 <th key={i} style={{
                   padding: "0.6rem 1rem",
                   textAlign: "left",
@@ -107,6 +108,21 @@ export function CheckInTable({ initialRows }: { initialRows: Row[] }) {
                       </div>
                     ) : (
                       <span style={{ color: "#1B3664" }}>{row.firstName} {row.lastName}</span>
+                    )}
+                  </td>
+
+                  <td style={{ padding: "0.7rem 1rem" }}>
+                    {isEditing ? (
+                      <input
+                        type="number"
+                        min={1}
+                        max={99}
+                        value={draft.age ?? ""}
+                        onChange={(e) => setDraft((d) => ({ ...d, age: parseInt(e.target.value) }))}
+                        style={{ ...inputSm, width: "52px" }}
+                      />
+                    ) : (
+                      <span style={{ color: "#1B3664" }}>{row.age}</span>
                     )}
                   </td>
 

@@ -52,6 +52,7 @@ export default async function AdminPage(props: {
     id: ci.id,
     firstName: ci.firstName,
     lastName: ci.lastName,
+    age: ci.age,
     parish: ci.parish,
     submittedAt: ci.submittedAt.toISOString(),
     ipAddress: ci.ipAddress,

@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
     token: string;
     firstName: string;
     lastName: string;
+    age: number;
     parish: string;
     deviceId: string;
     latitude: number;
@@ -26,9 +27,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });
   }
 
-  const { token: tokenValue, firstName, lastName, parish, deviceId, latitude, longitude } = body;
+  const { token: tokenValue, firstName, lastName, age, parish, deviceId, latitude, longitude } = body;
 
-  if (!tokenValue || !firstName || !lastName || !parish || !deviceId || latitude == null || longitude == null) {
+  if (!tokenValue || !firstName || !lastName || !age || !parish || !deviceId || latitude == null || longitude == null) {
     return NextResponse.json({ error: "MISSING_FIELDS" }, { status: 400 });
   }
 
@@ -72,6 +73,7 @@ export async function POST(request: NextRequest) {
       data: {
         firstName,
         lastName,
+        age,
         parish,
         deviceId,
         userAgent,

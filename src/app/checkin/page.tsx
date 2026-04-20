@@ -25,6 +25,7 @@ function CheckInForm() {
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [age, setAge] = useState("");
   const [parish, setParish] = useState("");
 
   const claimed = useRef(false);
@@ -82,6 +83,7 @@ function CheckInForm() {
           token,
           firstName: firstName.trim(),
           lastName: lastName.trim(),
+          age: parseInt(age),
           parish,
           deviceId,
           latitude: coords.latitude,
@@ -163,6 +165,16 @@ function CheckInForm() {
           placeholder="Last name"
           value={lastName}
           onChange={(e) => setLastName(e.target.value)}
+          style={inputStyle}
+        />
+        <input
+          required
+          type="number"
+          placeholder="Age"
+          min={1}
+          max={99}
+          value={age}
+          onChange={(e) => setAge(e.target.value)}
           style={inputStyle}
         />
         <select

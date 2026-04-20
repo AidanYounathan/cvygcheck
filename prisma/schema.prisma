@@ -22,6 +22,7 @@ model CheckIn {
   id          String   @id @default(cuid())
   firstName   String
   lastName    String
+  age         Int
   parish      String
   deviceId    String
   userAgent   String
