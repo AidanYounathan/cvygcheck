@@ -38,6 +38,15 @@ model Setting {
   value String
 }
 
+model GeoLocation {
+  id     String  @id @default(cuid())
+  label  String
+  lat    Float
+  lng    Float
+  radius Int     @default(150)
+  active Boolean @default(true)
+}
+
 model FormField {
   id       String  @id @default(cuid())
   label    String
