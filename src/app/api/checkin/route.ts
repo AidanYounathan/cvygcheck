@@ -14,8 +14,7 @@ export async function POST(request: NextRequest) {
     token: string;
     firstName: string;
     lastName: string;
-    age: number;
-    parish: string;
+    extras: Record<string, string>;
     deviceId: string;
     latitude: number;
     longitude: number;
@@ -27,9 +26,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });
   }
 
-  const { token: tokenValue, firstName, lastName, age, parish, deviceId, latitude, longitude } = body;
+  const { token: tokenValue, firstName, lastName, extras, deviceId, latitude, longitude } = body;
 
-  if (!tokenValue || !firstName || !lastName || !age || !parish || !deviceId || latitude == null || longitude == null) {
+  if (!tokenValue || !firstName || !lastName || !deviceId || latitude == null || longitude == null) {
     return NextResponse.json({ error: "MISSING_FIELDS" }, { status: 400 });
   }
 
@@ -39,12 +38,10 @@ export async function POST(request: NextRequest) {
   if (!token.claimed) return NextResponse.json({ error: "TOKEN_NOT_CLAIMED" }, { status: 400 });
   if (token.used) return NextResponse.json({ error: "TOKEN_ALREADY_USED" }, { status: 400 });
 
-  // Security layer 2: token expiry
   if (Date.now() - token.createdAt.getTime() > TOKEN_TTL_MS) {
     return NextResponse.json({ error: "TOKEN_EXPIRED" }, { status: 410 });
   }
 
-  // Security layer 3: geofence
   if (process.env.BYPASS_GEOFENCE !== "true") {
     try {
       if (!isWithinGeofence(latitude, longitude)) {
@@ -55,7 +52,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Security layer 4: one submission per device per day
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
@@ -67,14 +63,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "DEVICE_ALREADY_CHECKED_IN" }, { status: 409 });
   }
 
-  // Security layer 5: write audit record, mark token used
   await prisma.$transaction([
     prisma.checkIn.create({
       data: {
         firstName,
         lastName,
-        age,
-        parish,
+        extras: extras ?? {},
         deviceId,
         userAgent,
         ipAddress: ip,

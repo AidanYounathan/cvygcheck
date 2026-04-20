@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { HourlyChart, ParishChart } from "./_components/Charts";
 import { CheckInTable } from "./_components/CheckInTable";
@@ -18,23 +19,30 @@ export default async function AdminPage(props: {
   const dayStart = new Date(`${dateStr}T00:00:00.000Z`);
   const dayEnd = new Date(`${dateStr}T23:59:59.999Z`);
 
-  const checkIns = await prisma.checkIn.findMany({
-    where: { submittedAt: { gte: dayStart, lte: dayEnd } },
-    orderBy: { submittedAt: "desc" },
-  });
+  const [checkIns, formFields] = await Promise.all([
+    prisma.checkIn.findMany({
+      where: { submittedAt: { gte: dayStart, lte: dayEnd } },
+      orderBy: { submittedAt: "desc" },
+    }),
+    prisma.formField.findMany({ where: { active: true }, orderBy: { order: "asc" } }),
+  ]);
 
   const total = checkIns.length;
 
-  // Parish chart data
-  const parishMap = checkIns.reduce<Record<string, number>>((acc, ci) => {
-    acc[ci.parish] = (acc[ci.parish] ?? 0) + 1;
-    return acc;
-  }, {});
+  // Parish chart: use first select-type field if available
+  const parishField = formFields.find((f) => f.type === "select");
+  const parishMap = parishField
+    ? checkIns.reduce<Record<string, number>>((acc, ci) => {
+        const extras = ci.extras as Record<string, string>;
+        const val = extras?.[parishField.fieldKey] ?? "Unknown";
+        acc[val] = (acc[val] ?? 0) + 1;
+        return acc;
+      }, {})
+    : {};
   const parishData = Object.entries(parishMap)
     .map(([parish, count]) => ({ parish, count }))
     .sort((a, b) => b.count - a.count);
 
-  // Hourly chart data
   const hourlyMap = checkIns.reduce<Record<number, number>>((acc, ci) => {
     const h = ci.submittedAt.getUTCHours();
     acc[h] = (acc[h] ?? 0) + 1;
@@ -47,13 +55,11 @@ export default async function AdminPage(props: {
     }))
     .sort((a, b) => parseInt(a.hour) - parseInt(b.hour));
 
-  // Serialize for client components
   const serialized = checkIns.map((ci) => ({
     id: ci.id,
     firstName: ci.firstName,
     lastName: ci.lastName,
-    age: ci.age,
-    parish: ci.parish,
+    extras: (ci.extras ?? {}) as Record<string, string>,
     submittedAt: ci.submittedAt.toISOString(),
     ipAddress: ci.ipAddress,
     deviceId: ci.deviceId,
@@ -61,7 +67,6 @@ export default async function AdminPage(props: {
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#FAF7F2" }}>
-      {/* Header */}
       <div style={{
         backgroundColor: "#1B3664",
         padding: "1.25rem 2rem",
@@ -77,81 +82,40 @@ export default async function AdminPage(props: {
             CVYG Admin
           </span>
           <div style={{ width: "1px", height: "1.5rem", backgroundColor: "#C8A84B" }} />
+          <Link href="/admin/form" style={{ color: "#C8A84B", fontSize: "0.7rem", letterSpacing: "0.15em", textTransform: "uppercase", textDecoration: "none" }}>
+            Form Builder
+          </Link>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           <form method="GET" action="/admin" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <input
-              type="date"
-              name="date"
-              defaultValue={dateStr}
-              style={{
-                padding: "0.4rem 0.75rem",
-                backgroundColor: "transparent",
-                border: "1px solid #C8A84B",
-                color: "#FAF7F2",
-                fontSize: "0.75rem",
-                colorScheme: "dark",
-              }}
-            />
-            <button type="submit" style={{
-              padding: "0.4rem 0.75rem",
-              backgroundColor: "#C8A84B",
-              border: "none",
-              color: "#1B3664",
-              fontSize: "0.7rem",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              cursor: "pointer",
-            }}>Go</button>
+            <input type="date" name="date" defaultValue={dateStr} style={{ padding: "0.4rem 0.75rem", backgroundColor: "transparent", border: "1px solid #C8A84B", color: "#FAF7F2", fontSize: "0.75rem", colorScheme: "dark" }} />
+            <button type="submit" style={{ padding: "0.4rem 0.75rem", backgroundColor: "#C8A84B", border: "none", color: "#1B3664", fontSize: "0.7rem", letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer" }}>Go</button>
           </form>
-
           <form method="POST" action="/api/admin/logout">
-            <button type="submit" style={{
-              padding: "0.4rem 0.75rem",
-              backgroundColor: "transparent",
-              border: "1px solid #6B6B6B",
-              color: "#aaa",
-              fontSize: "0.7rem",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              cursor: "pointer",
-            }}>Logout</button>
+            <button type="submit" style={{ padding: "0.4rem 0.75rem", backgroundColor: "transparent", border: "1px solid #6B6B6B", color: "#aaa", fontSize: "0.7rem", letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer" }}>Logout</button>
           </form>
         </div>
       </div>
 
       <div style={{ padding: "2rem", maxWidth: "1200px", margin: "0 auto" }}>
-        {/* Stats */}
         <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
           <StatCard label="Total Check-Ins" value={total} />
-          <StatCard label="Parishes" value={parishData.length} />
+          <StatCard label={parishField ? `${parishField.label}s` : "Fields"} value={parishData.length} />
           <StatCard label="Date" value={dateStr} small />
         </div>
 
         {total === 0 ? (
-          <div style={{
-            padding: "3rem",
-            backgroundColor: "#fff",
-            border: "1px solid #E8E0D0",
-            textAlign: "center",
-            color: "#6B6B6B",
-            fontSize: "0.8rem",
-            letterSpacing: "0.15em",
-            textTransform: "uppercase",
-          }}>
+          <div style={{ padding: "3rem", backgroundColor: "#fff", border: "1px solid #E8E0D0", textAlign: "center", color: "#6B6B6B", fontSize: "0.8rem", letterSpacing: "0.15em", textTransform: "uppercase" }}>
             No check-ins on this date
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-            {/* Charts row */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
               <HourlyChart data={hourlyData} />
-              <ParishChart data={parishData} />
+              {parishData.length > 0 && <ParishChart data={parishData} />}
             </div>
-
-            {/* Table */}
-            <CheckInTable initialRows={serialized} />
+            <CheckInTable initialRows={serialized} formFields={formFields} />
           </div>
         )}
       </div>
@@ -161,19 +125,9 @@ export default async function AdminPage(props: {
 
 function StatCard({ label, value, small }: { label: string; value: string | number; small?: boolean }) {
   return (
-    <div style={{
-      backgroundColor: "#fff",
-      border: "1px solid #E8E0D0",
-      borderTop: "3px solid #C8A84B",
-      padding: "1.25rem 1.5rem",
-      minWidth: "140px",
-    }}>
-      <div style={{ fontSize: small ? "1rem" : "2rem", fontWeight: 300, color: "#1B3664", marginBottom: "0.25rem" }}>
-        {value}
-      </div>
-      <div style={{ fontSize: "0.65rem", letterSpacing: "0.15em", color: "#6B6B6B", textTransform: "uppercase" }}>
-        {label}
-      </div>
+    <div style={{ backgroundColor: "#fff", border: "1px solid #E8E0D0", borderTop: "3px solid #C8A84B", padding: "1.25rem 1.5rem", minWidth: "140px" }}>
+      <div style={{ fontSize: small ? "1rem" : "2rem", fontWeight: 300, color: "#1B3664", marginBottom: "0.25rem" }}>{value}</div>
+      <div style={{ fontSize: "0.65rem", letterSpacing: "0.15em", color: "#6B6B6B", textTransform: "uppercase" }}>{label}</div>
     </div>
   );
 }

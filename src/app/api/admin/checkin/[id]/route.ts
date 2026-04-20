@@ -13,11 +13,11 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const { firstName, lastName, age, parish } = await request.json();
+  const { firstName, lastName, extras } = await request.json();
 
   const updated = await prisma.checkIn.update({
     where: { id },
-    data: { firstName, lastName, age, parish },
+    data: { firstName, lastName, extras },
   });
 
   return NextResponse.json(updated);
