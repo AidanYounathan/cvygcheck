@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isWithinGeofence } from "@/lib/geofence";
-import { TOKEN_TTL_MS } from "@/lib/tokens";
+import { SUBMISSION_TTL_MS } from "@/lib/tokens";
 
 export async function POST(request: NextRequest) {
   const ip =
@@ -38,7 +38,8 @@ export async function POST(request: NextRequest) {
   if (!token.claimed) return NextResponse.json({ error: "TOKEN_NOT_CLAIMED" }, { status: 400 });
   if (token.used) return NextResponse.json({ error: "TOKEN_ALREADY_USED" }, { status: 400 });
 
-  if (Date.now() - token.createdAt.getTime() > TOKEN_TTL_MS) {
+  const claimedAt = token.claimedAt ?? token.createdAt;
+  if (Date.now() - claimedAt.getTime() > SUBMISSION_TTL_MS) {
     return NextResponse.json({ error: "TOKEN_EXPIRED" }, { status: 410 });
   }
 

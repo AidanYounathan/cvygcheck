@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
-export const TOKEN_TTL_MS = 2 * 60 * 1000; // 2 minutes
+export const TOKEN_TTL_MS = 2 * 60 * 1000;         // 2 min — unclaimed QR expires on kiosk
+export const SUBMISSION_TTL_MS = 10 * 60 * 1000;   // 10 min — time allowed to fill out form
 
 function generateValue(): string {
   return crypto.randomUUID().replace(/-/g, "");
