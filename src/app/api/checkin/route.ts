@@ -42,7 +42,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "TOKEN_EXPIRED" }, { status: 410 });
   }
 
-  if (process.env.BYPASS_GEOFENCE !== "true") {
+  const geofenceSetting = await prisma.setting.findUnique({ where: { key: "bypass_geofence" } });
+  const bypassGeofence = process.env.BYPASS_GEOFENCE === "true" || geofenceSetting?.value === "true";
+
+  if (!bypassGeofence) {
     try {
       if (!isWithinGeofence(latitude, longitude)) {
         return NextResponse.json({ error: "OUTSIDE_GEOFENCE" }, { status: 403 });

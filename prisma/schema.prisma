@@ -33,6 +33,11 @@ model CheckIn {
   token       Token    @relation(fields: [tokenId], references: [id])
 }
 
+model Setting {
+  key   String @id
+  value String
+}
+
 model FormField {
   id       String  @id @default(cuid())
   label    String
