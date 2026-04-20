@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { isWithinGeofence } from "@/lib/geofence";
+import { isWithinAny, isWithinGeofence } from "@/lib/geofence";
 import { SUBMISSION_TTL_MS } from "@/lib/tokens";
 
 export async function POST(request: NextRequest) {
@@ -43,16 +43,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "TOKEN_EXPIRED" }, { status: 410 });
   }
 
-  const geofenceSetting = await prisma.setting.findUnique({ where: { key: "bypass_geofence" } });
+  const [geofenceSetting, dbLocations] = await Promise.all([
+    prisma.setting.findUnique({ where: { key: "bypass_geofence" } }),
+    prisma.geoLocation.findMany({ where: { active: true } }),
+  ]);
   const bypassGeofence = process.env.BYPASS_GEOFENCE === "true" || geofenceSetting?.value === "true";
 
   if (!bypassGeofence) {
-    try {
-      if (!isWithinGeofence(latitude, longitude)) {
-        return NextResponse.json({ error: "OUTSIDE_GEOFENCE" }, { status: 403 });
-      }
-    } catch {
-      return NextResponse.json({ error: "GEOFENCE_MISCONFIGURED" }, { status: 500 });
+    const allowed = dbLocations.length > 0
+      ? isWithinAny(latitude, longitude, dbLocations)
+      : (() => { try { return isWithinGeofence(latitude, longitude); } catch { return false; } })();
+
+    if (!allowed) {
+      return NextResponse.json({ error: "OUTSIDE_GEOFENCE" }, { status: 403 });
     }
   }
 

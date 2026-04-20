@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { HourlyChart, ParishChart } from "./_components/Charts";
 import { CheckInTable } from "./_components/CheckInTable";
 import { GeofenceToggle } from "./_components/GeofenceToggle";
+import { LocationManager } from "./_components/LocationManager";
 
 export default async function AdminPage(props: {
   searchParams: Promise<{ date?: string }>;
@@ -20,13 +21,14 @@ export default async function AdminPage(props: {
   const dayStart = new Date(`${dateStr}T00:00:00.000Z`);
   const dayEnd = new Date(`${dateStr}T23:59:59.999Z`);
 
-  const [checkIns, formFields, geofenceSetting] = await Promise.all([
+  const [checkIns, formFields, geofenceSetting, geoLocations] = await Promise.all([
     prisma.checkIn.findMany({
       where: { submittedAt: { gte: dayStart, lte: dayEnd } },
       orderBy: { submittedAt: "desc" },
     }),
     prisma.formField.findMany({ where: { active: true }, orderBy: { order: "asc" } }),
     prisma.setting.findUnique({ where: { key: "bypass_geofence" } }),
+    prisma.geoLocation.findMany({ orderBy: { label: "asc" } }),
   ]);
   const geofenceBypassed = geofenceSetting?.value === "true" || process.env.BYPASS_GEOFENCE === "true";
 
@@ -102,8 +104,9 @@ export default async function AdminPage(props: {
       </div>
 
       <div style={{ padding: "2rem", maxWidth: "1200px", margin: "0 auto" }}>
-        <div style={{ marginBottom: "1.5rem" }}>
+        <div style={{ marginBottom: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
           <GeofenceToggle initial={geofenceBypassed} />
+          <LocationManager initial={geoLocations} />
         </div>
 
         <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
