@@ -2,9 +2,10 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { HourlyChart, ParishChart } from "./_components/Charts";
+import { HourlyChart, ParishChart, AllTimeChart } from "./_components/Charts";
 import { CheckInTable } from "./_components/CheckInTable";
 import { GeofenceToggle } from "./_components/GeofenceToggle";
+import { DeviceBypassToggle } from "./_components/DeviceBypassToggle";
 import { LocationManager } from "./_components/LocationManager";
 
 export default async function AdminPage(props: {
@@ -21,16 +22,19 @@ export default async function AdminPage(props: {
   const dayStart = new Date(`${dateStr}T00:00:00.000Z`);
   const dayEnd = new Date(`${dateStr}T23:59:59.999Z`);
 
-  const [checkIns, formFields, geofenceSetting, geoLocations] = await Promise.all([
+  const [checkIns, formFields, geofenceSetting, deviceBypassSetting, geoLocations, allCheckInDates] = await Promise.all([
     prisma.checkIn.findMany({
       where: { submittedAt: { gte: dayStart, lte: dayEnd } },
       orderBy: { submittedAt: "desc" },
     }),
     prisma.formField.findMany({ where: { active: true }, orderBy: { order: "asc" } }),
     prisma.setting.findUnique({ where: { key: "bypass_geofence" } }),
+    prisma.setting.findUnique({ where: { key: "bypass_device_limit" } }),
     prisma.geoLocation.findMany({ orderBy: { label: "asc" } }),
+    prisma.checkIn.findMany({ select: { submittedAt: true }, orderBy: { submittedAt: "asc" } }),
   ]);
   const geofenceBypassed = geofenceSetting?.value === "true" || process.env.BYPASS_GEOFENCE === "true";
+  const deviceLimitBypassed = deviceBypassSetting?.value === "true";
 
   const total = checkIns.length;
 
@@ -59,6 +63,15 @@ export default async function AdminPage(props: {
       count,
     }))
     .sort((a, b) => parseInt(a.hour) - parseInt(b.hour));
+
+  const allTimeDailyMap = allCheckInDates.reduce<Record<string, number>>((acc, ci) => {
+    const d = ci.submittedAt.toISOString().split("T")[0];
+    acc[d] = (acc[d] ?? 0) + 1;
+    return acc;
+  }, {});
+  const allTimeData = Object.entries(allTimeDailyMap).map(([date, count]) => ({ date, count }));
+
+  const todayDevices = checkIns.map((ci) => ({ deviceId: ci.deviceId, name: `${ci.firstName} ${ci.lastName}` }));
 
   const serialized = checkIns.map((ci) => ({
     id: ci.id,
@@ -106,6 +119,7 @@ export default async function AdminPage(props: {
       <div style={{ padding: "2rem", maxWidth: "1200px", margin: "0 auto" }}>
         <div style={{ marginBottom: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
           <GeofenceToggle initial={geofenceBypassed} />
+          <DeviceBypassToggle initial={deviceLimitBypassed} />
           <LocationManager initial={geoLocations} />
         </div>
 
@@ -113,6 +127,10 @@ export default async function AdminPage(props: {
           <StatCard label="Total Check-Ins" value={total} />
           <StatCard label={parishField ? `${parishField.label}s` : "Fields"} value={parishData.length} />
           <StatCard label="Date" value={dateStr} small />
+        </div>
+
+        <div style={{ marginBottom: "1.5rem" }}>
+          <AllTimeChart data={allTimeData} />
         </div>
 
         {total === 0 ? (
@@ -126,8 +144,28 @@ export default async function AdminPage(props: {
               {parishData.length > 0 && <ParishChart data={parishData} />}
             </div>
             <CheckInTable initialRows={serialized} formFields={formFields} />
+            <DeviceListCard devices={todayDevices} />
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function DeviceListCard({ devices }: { devices: { deviceId: string; name: string }[] }) {
+  if (devices.length === 0) return null;
+  return (
+    <div style={{ backgroundColor: "#fff", border: "1px solid #E8E0D0", padding: "1.5rem" }}>
+      <h2 style={{ margin: "0 0 1rem", fontSize: "0.7rem", letterSpacing: "0.2em", color: "#C8A84B", textTransform: "uppercase" }}>
+        Checked-In Devices Today ({devices.length})
+      </h2>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+        {devices.map(({ deviceId, name }) => (
+          <div key={deviceId} style={{ display: "flex", justifyContent: "space-between", padding: "0.5rem 0.75rem", backgroundColor: "#FAF7F2", fontSize: "0.75rem" }}>
+            <span style={{ color: "#1B3664", fontWeight: 500 }}>{name}</span>
+            <span style={{ color: "#6B6B6B", fontFamily: "monospace", fontSize: "0.65rem" }}>{deviceId}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

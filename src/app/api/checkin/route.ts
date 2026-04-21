@@ -43,11 +43,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "TOKEN_EXPIRED" }, { status: 410 });
   }
 
-  const [geofenceSetting, dbLocations] = await Promise.all([
+  const [geofenceSetting, deviceBypassSetting, dbLocations] = await Promise.all([
     prisma.setting.findUnique({ where: { key: "bypass_geofence" } }),
+    prisma.setting.findUnique({ where: { key: "bypass_device_limit" } }),
     prisma.geoLocation.findMany({ where: { active: true } }),
   ]);
   const bypassGeofence = process.env.BYPASS_GEOFENCE === "true" || geofenceSetting?.value === "true";
+  const bypassDeviceLimit = deviceBypassSetting?.value === "true";
 
   if (!bypassGeofence) {
     const allowed = dbLocations.length > 0
@@ -59,15 +61,17 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
+  if (!bypassDeviceLimit) {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
 
-  const duplicate = await prisma.checkIn.findFirst({
-    where: { deviceId, submittedAt: { gte: startOfDay } },
-  });
+    const duplicate = await prisma.checkIn.findFirst({
+      where: { deviceId, submittedAt: { gte: startOfDay } },
+    });
 
-  if (duplicate) {
-    return NextResponse.json({ error: "DEVICE_ALREADY_CHECKED_IN" }, { status: 409 });
+    if (duplicate) {
+      return NextResponse.json({ error: "DEVICE_ALREADY_CHECKED_IN" }, { status: 409 });
+    }
   }
 
   await prisma.$transaction([
