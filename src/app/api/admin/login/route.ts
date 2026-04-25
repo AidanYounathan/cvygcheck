@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { createSessionToken } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   const { password } = await request.json();
@@ -9,11 +10,11 @@ export async function POST(request: NextRequest) {
   }
 
   const cookieStore = await cookies();
-  cookieStore.set("admin-session", process.env.ADMIN_PASSWORD, {
+  cookieStore.set("admin-session", createSessionToken(), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: 60 * 60 * 8, // 8 hours
+    maxAge: 60 * 60 * 8,
     path: "/",
   });
 

@@ -3,11 +3,33 @@ import { prisma } from "@/lib/prisma";
 import { isWithinAny, isWithinGeofence } from "@/lib/geofence";
 import { SUBMISSION_TTL_MS } from "@/lib/tokens";
 
+// Per-instance rate limit: 10 attempts per IP per 10 minutes.
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 10;
+const RATE_WINDOW_MS = 10 * 60 * 1000;
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
 export async function POST(request: NextRequest) {
   const ip =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     request.headers.get("x-real-ip") ??
     "0.0.0.0";
+
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json({ error: "TOO_MANY_REQUESTS" }, { status: 429 });
+  }
+
   const userAgent = request.headers.get("user-agent") ?? "unknown";
 
   let body: {
@@ -30,6 +52,10 @@ export async function POST(request: NextRequest) {
 
   if (!tokenValue || !firstName || !lastName || !deviceId || latitude == null || longitude == null) {
     return NextResponse.json({ error: "MISSING_FIELDS" }, { status: 400 });
+  }
+
+  if (firstName.trim().length > 50 || lastName.trim().length > 50 || deviceId.length > 128) {
+    return NextResponse.json({ error: "INVALID_FIELDS" }, { status: 400 });
   }
 
   const token = await prisma.token.findUnique({ where: { value: tokenValue } });
@@ -62,8 +88,8 @@ export async function POST(request: NextRequest) {
   }
 
   if (!bypassDeviceLimit) {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
     const duplicate = await prisma.checkIn.findFirst({
       where: { deviceId, submittedAt: { gte: startOfDay } },
@@ -77,8 +103,8 @@ export async function POST(request: NextRequest) {
   await prisma.$transaction([
     prisma.checkIn.create({
       data: {
-        firstName,
-        lastName,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         extras: extras ?? {},
         deviceId,
         userAgent,

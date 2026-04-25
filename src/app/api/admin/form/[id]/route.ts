@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-
-async function requireAdmin() {
-  const cookieStore = await cookies();
-  const session = cookieStore.get("admin-session");
-  return session?.value === process.env.ADMIN_PASSWORD;
-}
+import { requireAdmin } from "@/lib/auth";
 
 export async function PATCH(
   request: NextRequest,
@@ -17,7 +11,6 @@ export async function PATCH(
   }
   const { id } = await params;
   const data = await request.json();
-
   const field = await prisma.formField.update({ where: { id }, data });
   return NextResponse.json(field);
 }

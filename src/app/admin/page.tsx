@@ -1,7 +1,7 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 import { HourlyChart, ParishChart, AllTimeChart } from "./_components/Charts";
 import { CheckInTable } from "./_components/CheckInTable";
 import { GeofenceToggle } from "./_components/GeofenceToggle";
@@ -11,9 +11,7 @@ import { LocationManager } from "./_components/LocationManager";
 export default async function AdminPage(props: {
   searchParams: Promise<{ date?: string }>;
 }) {
-  const cookieStore = await cookies();
-  const session = cookieStore.get("admin-session");
-  if (!session || session.value !== process.env.ADMIN_PASSWORD) {
+  if (!(await requireAdmin())) {
     redirect("/admin/login");
   }
 

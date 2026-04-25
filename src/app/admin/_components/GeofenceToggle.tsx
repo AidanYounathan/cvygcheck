@@ -5,17 +5,25 @@ import { useState } from "react";
 export function GeofenceToggle({ initial }: { initial: boolean }) {
   const [bypassed, setBypassed] = useState(initial);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(false);
 
   async function toggle() {
     setSaving(true);
+    setError(false);
     const next = !bypassed;
-    await fetch("/api/admin/settings", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bypass_geofence: String(next) }),
-    });
-    setBypassed(next);
-    setSaving(false);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bypass_geofence: String(next) }),
+      });
+      if (!res.ok) throw new Error();
+      setBypassed(next);
+    } catch {
+      setError(true);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -30,8 +38,12 @@ export function GeofenceToggle({ initial }: { initial: boolean }) {
     }}>
       <div>
         <span style={{ fontSize: "0.8rem", color: "#1B3664", fontWeight: 500 }}>Geofence Bypass</span>
-        <p style={{ margin: "0.15rem 0 0", fontSize: "0.7rem", color: "#6B6B6B" }}>
-          {bypassed ? "⚠ Geofence is OFF — anyone can check in from anywhere." : "Geofence is active — check-ins require being on-site."}
+        <p style={{ margin: "0.15rem 0 0", fontSize: "0.7rem", color: error ? "#c0392b" : "#6B6B6B" }}>
+          {error
+            ? "Failed to save — please try again."
+            : bypassed
+            ? "⚠ Geofence is OFF — anyone can check in from anywhere."
+            : "Geofence is active — check-ins require being on-site."}
         </p>
       </div>
       <button

@@ -2,34 +2,29 @@ import Link from "next/link";
 
 export default function QRPage() {
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-[#FAF7F2]">
-      <div className="flex flex-col items-center gap-10 px-6 text-center max-w-lg">
-        <div className="flex flex-col items-center gap-2">
-          <h1 className="text-xl font-light tracking-[0.2em] text-[#1B3664] uppercase">
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", backgroundColor: "#FAF7F2", padding: "2rem" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2.5rem", maxWidth: "28rem", width: "100%", textAlign: "center" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
+          <h1 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 300, letterSpacing: "0.2em", color: "#1B3664", textTransform: "uppercase" }}>
             Scan to Check In
           </h1>
-          <div className="w-16 h-px bg-[#C8A84B] mt-1" />
+          <div style={{ width: "4rem", height: "1px", backgroundColor: "#C8A84B", marginTop: "0.25rem" }} />
         </div>
 
-        <div className="p-6 bg-white border border-[#E8E0D0] shadow-sm">
-          <div className="w-56 h-56 bg-[#E8E0D0] flex items-center justify-center">
-            <span className="text-xs tracking-wider text-[#6B6B6B] uppercase">
-              QR Code
-            </span>
+        <div style={{ padding: "1.5rem", backgroundColor: "#fff", border: "1px solid #E8E0D0", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+          <div style={{ width: "14rem", height: "14rem", backgroundColor: "#E8E0D0", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontSize: "0.75rem", letterSpacing: "0.1em", color: "#6B6B6B", textTransform: "uppercase" }}>QR Code</span>
           </div>
         </div>
 
-        <p className="text-xs tracking-[0.2em] text-[#6B6B6B] uppercase">
+        <p style={{ margin: 0, fontSize: "0.7rem", letterSpacing: "0.2em", color: "#6B6B6B", textTransform: "uppercase" }}>
           Point your camera at the code above
         </p>
 
-        <Link
-          href="/"
-          className="text-xs tracking-[0.2em] text-[#1B3664] uppercase hover:text-[#C8A84B] transition-colors duration-300"
-        >
+        <Link href="/" style={{ fontSize: "0.7rem", letterSpacing: "0.2em", color: "#1B3664", textTransform: "uppercase", textDecoration: "none" }}>
           ← Back
         </Link>
       </div>
-    </main>
+    </div>
   );
 }
