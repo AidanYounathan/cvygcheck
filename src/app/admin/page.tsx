@@ -101,6 +101,9 @@ export default async function AdminPage(props: {
           <Link href="/admin/form" style={{ color: "#C8A84B", fontSize: "0.7rem", letterSpacing: "0.15em", textTransform: "uppercase", textDecoration: "none" }}>
             Form Builder
           </Link>
+          <Link href="/admin/attendance" style={{ color: "#C8A84B", fontSize: "0.7rem", letterSpacing: "0.15em", textTransform: "uppercase", textDecoration: "none" }}>
+            Attendance
+          </Link>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
