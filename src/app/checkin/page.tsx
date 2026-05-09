@@ -46,10 +46,10 @@ function CheckInForm() {
       import("@fingerprintjs/fingerprintjs").then((FP) =>
         FP.default.load().then((fp) => fp.get()).then((r) => r.visitorId)
       ),
-      new Promise<{ latitude: number; longitude: number }>((resolve, reject) => {
+      new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
         navigator.geolocation.getCurrentPosition(
           (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-          () => reject("LOCATION_DENIED")
+          () => resolve(null)
         );
       }),
       fetch("/api/form-config").then((r) => r.json()),
@@ -73,7 +73,7 @@ function CheckInForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!coords || !deviceId || !token) return;
+    if (!deviceId || !token) return;
     setStatus("submitting");
 
     try {
@@ -86,8 +86,8 @@ function CheckInForm() {
           lastName: lastName.trim(),
           extras,
           deviceId,
-          latitude: coords.latitude,
-          longitude: coords.longitude,
+          latitude: coords?.latitude ?? 0,
+          longitude: coords?.longitude ?? 0,
         }),
       });
 
@@ -109,7 +109,6 @@ function CheckInForm() {
       TOKEN_NOT_FOUND: "Invalid QR code. Please scan the kiosk again.",
       OUTSIDE_GEOFENCE: "You don't appear to be at the church. Check-in requires you to be on-site.",
       DEVICE_ALREADY_CHECKED_IN: "This device has already checked in today.",
-      LOCATION_DENIED: "Location access is required. Please allow location and scan again.",
     };
     return map[code] ?? "Something went wrong. Please scan the QR code again.";
   }
@@ -186,12 +185,12 @@ function CheckInForm() {
         })}
 
         {!coords && (
-          <p style={{ ...sub, fontSize: "0.7rem", color: "#999" }}>Waiting for location access…</p>
+          <p style={{ ...sub, fontSize: "0.7rem", color: "#999" }}>Location unavailable — check-in may be denied if geofence is active.</p>
         )}
 
         <button
           type="submit"
-          disabled={status === "submitting" || !coords}
+          disabled={status === "submitting"}
           style={{
             marginTop: "0.5rem",
             padding: "1rem",
@@ -201,8 +200,8 @@ function CheckInForm() {
             fontSize: "0.75rem",
             letterSpacing: "0.25em",
             textTransform: "uppercase",
-            cursor: status === "submitting" || !coords ? "not-allowed" : "pointer",
-            opacity: status === "submitting" || !coords ? 0.6 : 1,
+            cursor: status === "submitting" ? "not-allowed" : "pointer",
+            opacity: status === "submitting" ? 0.6 : 1,
           }}
         >
           {status === "submitting" ? "Submitting…" : "Submit"}
