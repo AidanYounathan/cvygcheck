@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
     const status = msg === "TOKEN_NOT_FOUND" ? 404 : msg === "TOKEN_EXPIRED" ? 410 : 400;
     return NextResponse.json({ error: msg }, { status });
   }
+  const validToken = token!;
 
   const [geofenceSetting, deviceBypassSetting, dbLocations] = await Promise.all([
     prisma.setting.findUnique({ where: { key: "bypass_geofence" } }),
@@ -110,11 +111,11 @@ export async function POST(request: NextRequest) {
         ipAddress: ip,
         latitude,
         longitude,
-        tokenId: token.id,
+        tokenId: validToken.id,
       },
     }),
     prisma.token.update({
-      where: { id: token.id },
+      where: { id: validToken.id },
       data: { used: true, usedAt: new Date() },
     }),
   ]);
