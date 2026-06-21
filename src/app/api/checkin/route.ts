@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isWithinAny, isWithinGeofence } from "@/lib/geofence";
-import { SUBMISSION_TTL_MS } from "@/lib/tokens";
+import { validateForSubmit } from "@/lib/tokens";
 
 // Per-instance rate limit: 10 attempts per IP per 10 minutes.
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -60,13 +60,12 @@ export async function POST(request: NextRequest) {
 
   const token = await prisma.token.findUnique({ where: { value: tokenValue } });
 
-  if (!token) return NextResponse.json({ error: "TOKEN_NOT_FOUND" }, { status: 404 });
-  if (!token.claimed) return NextResponse.json({ error: "TOKEN_NOT_CLAIMED" }, { status: 400 });
-  if (token.used) return NextResponse.json({ error: "TOKEN_ALREADY_USED" }, { status: 400 });
-
-  const claimedAt = token.claimedAt ?? token.createdAt;
-  if (Date.now() - claimedAt.getTime() > SUBMISSION_TTL_MS) {
-    return NextResponse.json({ error: "TOKEN_EXPIRED" }, { status: 410 });
+  try {
+    validateForSubmit(token);
+  } catch (e) {
+    const msg = (e as Error).message;
+    const status = msg === "TOKEN_NOT_FOUND" ? 404 : msg === "TOKEN_EXPIRED" ? 410 : 400;
+    return NextResponse.json({ error: msg }, { status });
   }
 
   const [geofenceSetting, deviceBypassSetting, dbLocations] = await Promise.all([

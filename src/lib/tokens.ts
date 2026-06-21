@@ -3,6 +3,28 @@ import { prisma } from "@/lib/prisma";
 export const TOKEN_TTL_MS = 2 * 60 * 1000;         // 2 min — unclaimed QR expires on kiosk
 export const SUBMISSION_TTL_MS = 10 * 60 * 1000;   // 10 min — time allowed to fill out form
 
+// Minimal shape needed for validation — plain objects satisfy this, so tests never import Prisma
+export type TokenForValidation = {
+  claimed: boolean;
+  claimedAt: Date | null;
+  used: boolean;
+  createdAt: Date;
+};
+
+export function validateForClaim(token: TokenForValidation | null, now = Date.now()): void {
+  if (!token) throw new Error("TOKEN_NOT_FOUND");
+  if (token.claimed) throw new Error("TOKEN_ALREADY_CLAIMED");
+  if (token.createdAt.getTime() < now - TOKEN_TTL_MS) throw new Error("TOKEN_EXPIRED");
+}
+
+export function validateForSubmit(token: TokenForValidation | null, now = Date.now()): void {
+  if (!token) throw new Error("TOKEN_NOT_FOUND");
+  if (!token.claimed) throw new Error("TOKEN_NOT_CLAIMED");
+  if (token.used) throw new Error("TOKEN_ALREADY_USED");
+  const claimedAt = token.claimedAt ?? token.createdAt;
+  if (now - claimedAt.getTime() > SUBMISSION_TTL_MS) throw new Error("TOKEN_EXPIRED");
+}
+
 function generateValue(): string {
   return crypto.randomUUID().replace(/-/g, "");
 }
@@ -21,18 +43,16 @@ export async function getOrCreateActiveToken() {
 }
 
 export async function claimToken(value: string) {
-  const expiryThreshold = new Date(Date.now() - TOKEN_TTL_MS);
+  const now = Date.now();
 
   return prisma.$transaction(async (tx) => {
     const token = await tx.token.findUnique({ where: { value } });
 
-    if (!token) throw new Error("TOKEN_NOT_FOUND");
-    if (token.claimed) throw new Error("TOKEN_ALREADY_CLAIMED");
-    if (token.createdAt < expiryThreshold) throw new Error("TOKEN_EXPIRED");
+    validateForClaim(token, now);
 
     const [claimed] = await Promise.all([
       tx.token.update({
-        where: { id: token.id },
+        where: { id: token!.id },
         data: { claimed: true, claimedAt: new Date() },
       }),
       tx.token.create({ data: { value: generateValue() } }),
