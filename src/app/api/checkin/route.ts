@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isWithinAny, isWithinGeofence } from "@/lib/geofence";
+import { startOfLocalDay } from "@/lib/time";
 import { validateForSubmit } from "@/lib/tokens";
 
 // Per-instance rate limit: 10 attempts per IP per 10 minutes.
@@ -88,8 +89,8 @@ export async function POST(request: NextRequest) {
   }
 
   if (!bypassDeviceLimit) {
-    const now = new Date();
-    const startOfDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    // Local (Pacific) day, so an evening event isn't split at midnight UTC.
+    const startOfDay = startOfLocalDay(new Date());
 
     const duplicate = await prisma.checkIn.findFirst({
       where: { deviceId, submittedAt: { gte: startOfDay } },

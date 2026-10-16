@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { localDateKey, localHour, localDayRange } from "@/lib/time";
 import { requireAdmin } from "@/lib/auth";
 import { HourlyChart, ParishChart, AllTimeChart } from "./_components/Charts";
 import { CheckInTable } from "./_components/CheckInTable";
@@ -16,13 +17,13 @@ export default async function AdminPage(props: {
   }
 
   const { date: dateParam } = await props.searchParams;
-  const dateStr = dateParam ?? new Date().toISOString().split("T")[0];
-  const dayStart = new Date(`${dateStr}T00:00:00.000Z`);
-  const dayEnd = new Date(`${dateStr}T23:59:59.999Z`);
+  const todayKey = localDateKey(new Date());
+  const dateStr = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : todayKey;
+  const { start: dayStart, end: dayEnd } = localDayRange(dateStr);
 
   const [checkIns, formFields, geofenceSetting, deviceBypassSetting, geoLocations, allCheckInDates] = await Promise.all([
     prisma.checkIn.findMany({
-      where: { submittedAt: { gte: dayStart, lte: dayEnd } },
+      where: { submittedAt: { gte: dayStart, lt: dayEnd } },
       orderBy: { submittedAt: "desc" },
     }),
     prisma.formField.findMany({ where: { active: true }, orderBy: { order: "asc" } }),
@@ -51,19 +52,20 @@ export default async function AdminPage(props: {
     .sort((a, b) => b.count - a.count);
 
   const hourlyMap = checkIns.reduce<Record<number, number>>((acc, ci) => {
-    const h = ci.submittedAt.getUTCHours();
+    const h = localHour(ci.submittedAt);
     acc[h] = (acc[h] ?? 0) + 1;
     return acc;
   }, {});
   const hourlyData = Object.entries(hourlyMap)
-    .map(([h, count]) => ({
-      hour: `${String(parseInt(h) % 12 || 12)}${parseInt(h) < 12 ? "am" : "pm"}`,
+    .map(([h, count]) => ({ h: parseInt(h), count }))
+    .sort((a, b) => a.h - b.h)
+    .map(({ h, count }) => ({
+      hour: `${String(h % 12 || 12)}${h < 12 ? "am" : "pm"}`,
       count,
-    }))
-    .sort((a, b) => parseInt(a.hour) - parseInt(b.hour));
+    }));
 
   const allTimeDailyMap = allCheckInDates.reduce<Record<string, number>>((acc, ci) => {
-    const d = ci.submittedAt.toISOString().split("T")[0];
+    const d = localDateKey(ci.submittedAt);
     acc[d] = (acc[d] ?? 0) + 1;
     return acc;
   }, {});
